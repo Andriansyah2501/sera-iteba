@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SERA ITEBA DASHBOARD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base styles */
+        body {
+            font-family: 'Montserrat', sans-serif; /* Changed font for a fresh look */
+            background: linear-gradient(135deg, #89cff0 0%, #007bff 100%); /* Sea blue gradient background */
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh; /* Ensure background covers full height */
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Main container for the entire dashboard */
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            display: grid;
+            gap: 1.5rem;
+            grid-template-columns: 1fr; /* Default: one column for mobile */
+            flex-grow: 1; /* Allow container to grow and push footer down if any */
+        }
+
+        /* Responsive grid layout */
+        @media (min-width: 768px) { /* Medium screens (tablets) */
+            .container {
+                grid-template-columns: repeat(2, 1fr); /* Two columns */
+            }
+            .dashboard-header {
+                grid-column: span 2 / span 2;
+            }
+            .main-section { /* Main sections take full width on tablets */
+                grid-column: span 2 / span 2;
+                display: flex; /* Use flex to stack h2 and the cards grid */
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            .heart-rate-cards-grid, .lora-cards-grid {
+                display: grid;
+                grid-template-columns: 1fr; /* Stack cards within sections on tablet */
+                gap: 1.5rem;
+                flex-grow: 1;
+            }
+            .lora-cards-grid .map-card,
+            .lora-cards-grid .dbm-card,
+            .lora-cards-grid .position-log-card,
+            .lora-cards-grid .dbm-log-card {
+                grid-column: span 1 / span 1; /* Each takes full width in its grid */
+            }
+            /* Removed footer grid for tablets as it's no longer needed */
+        }
+
+        @media (min-width: 1024px) { /* Large screens (desktops) */
+            .container {
+                grid-template-columns: repeat(2, 1fr); /* Two main columns for desktop */
+            }
+            .dashboard-header {
+                grid-column: span 2 / span 2; /* Header spans both main columns */
+            }
+            .main-section {
+                grid-column: span 1 / span 1; /* Each main section takes one column */
+                display: flex; /* Use flex to stack h2 and the cards grid */
+                flex-direction: column;
+                gap: 1.5rem; /* Gap between h2 and cards-grid */
+                border: 1px solid rgba(255, 255, 255, 0.3); /* Subtle border for main sections */
+                border-radius: 0.75rem;
+                padding: 1.5rem; /* Add padding to main sections */
+                background-color: rgba(255, 255, 255, 0.05); /* Very light transparent background */
+            }
+            .heart-rate-cards-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr); /* Two columns for heart rate cards */
+                grid-template-rows: auto auto; /* Two rows for display/chart and log/temp */
+                gap: 1.5rem;
+                flex-grow: 1; /* Allow it to take available height */
+            }
+            /* Place cards in a 2x2 grid */
+            .heart-rate-cards-grid .hr-display-card {
+                grid-column: 1;
+                grid-row: 1;
+            }
+            .heart-rate-cards-grid .hr-chart-card {
+                grid-column: 1;
+                grid-row: 2;
+            }
+            .heart-rate-cards-grid .hr-log-card {
+                grid-column: 2;
+                grid-row: 1;
+            }
+            .heart-rate-cards-grid .body-temperature-card { /* Body Temperature card now part of this grid */
+                grid-column: 2;
+                grid-row: 2;
+            }
+
+            .lora-cards-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr); /* Two columns for LoRa items */
+                gap: 1.5rem;
+                flex-grow: 1; /* Allow it to take available height */
+            }
+            .lora-cards-grid .map-card {
+                grid-column: span 2 / span 2; /* Map takes full width within LoRa section */
+            }
+            .lora-cards-grid .dbm-card {
+                grid-column: span 1 / span 1; /* DBM card takes 1 column */
+            }
+            .lora-cards-grid .position-log-card {
+                grid-column: span 1 / span 1; /* Position log card takes 1 column */
+            }
+            .lora-cards-grid .dbm-log-card {
+                grid-column: span 2 / span 2; /* DBM log card takes full width */
+            }
+            /* Removed footer grid for desktops as it's no longer needed */
+        }
+
+        /* Header styling */
+        .dashboard-header {
+            grid-column: 1 / -1; /* Spans all columns */
+            text-align: center;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem 0; /* Added padding */
+            background-color: rgba(255, 255, 255, 0.1); /* Slightly transparent background */
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .dashboard-header img {
+            max-height: 80px; /* Adjust logo size */
+            margin-bottom: 1rem;
+            border-radius: 0.5rem; /* Slightly rounded corners for the logo */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for logo */
+        }
+        .dashboard-header h1 {
+            font-size: 2.5rem; /* text-4xl */
+            font-weight: 700; /* font-bold */
+            color: #f1faee; /* Lighter color for contrast */
+            margin: 0; /* Remove default margin */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3); /* Subtle text shadow */
+        }
+        .dashboard-meta-info {
+            display: flex;
+            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            font-size: 0.95rem;
+            color: #f1faee; /* Lighter color for contrast */
+        }
+        .dashboard-meta-info span {
+            font-weight: 600;
+        }
+
+        /* Card general styling */
+        .card {
+            background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent white background */
+            border-radius: 0.75rem; /* rounded-lg */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* More pronounced shadow */
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            height: 100%; /* Make cards fill height of their grid cell */
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* Smooth transitions */
+        }
+        .card:hover {
+            transform: translateY(-5px); /* Lift card on hover */
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3); /* Deeper shadow on hover */
+        }
+        .card h2, .card h3 {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 700; /* font-bold */
+            margin-bottom: 1rem;
+            color: #1d3557; /* Darker blue for headings */
+        }
+        .card h3 {
+            font-size: 1.25rem; /* text-xl */
+        }
+
+        /* Map specific styling */
+        #mapid {
+            height: 180px; /* Further adjusted height for map */
+            width: 100%;
+            border-radius: 0.75rem; /* rounded-lg */
+            margin-top: 1rem;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); /* Inner shadow for map */
+        }
+
+        /* Location info styling */
+        .location-info p {
+            font-size: 1.125rem; /* text-lg */
+            margin-top: 0.5rem;
+            color: #457b9d; /* Blue tone for location info */
+        }
+
+        /* Heart rate display styling */
+        .hr-display-card .heart-rate-display {
+            font-size: 3rem; /* text-5xl */
+            font-weight: 700; /* font-bold */
+            color: #e63946; /* Brighter red */
+        }
+
+        /* Heart rate chart styling */
+        .hr-chart-card #heartRateChart {
+            max-width: 100%;
+            height: 100px; /* Adjusted height for chart to be smaller */
+        }
+
+        /* Body Temperature styling */
+        .body-temperature-card #bodyTemperature {
+            font-size: 3rem; /* Large text for temperature */
+            font-weight: 700;
+            color: #f4a261; /* Orange for temperature */
+        }
+        .body-temperature-card .temp-status {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .temp-normal { background-color: #d4edda; color: #155724; } /* Lighter green */
+        .temp-fever { background-color: #f8d7da; color: #721c24; } /* Lighter red */
+        .temp-hypothermia { background-color: #cfe2ff; color: #073a77; } /* Lighter blue */
+
+
+        /* DBM display styling */
+        .dbm-display {
+            font-size: 3rem; /* text-5xl */
+            font-weight: 700; /* font-bold */
+            color: #2a9d8f; /* Teal green for DBM */
+            margin-bottom: 0.5rem; /* Adjusted for RSSI/Status */
+        }
+        .dbm-info p {
+            font-size: 1.125rem;
+            color: #457b9d;
+            margin-bottom: 0.5rem;
+        }
+        .signal-status {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-good { background-color: #d4edda; color: #155724; } /* Lighter green */
+        .status-fair { background-color: #fff3cd; color: #856404; } /* Lighter yellow */
+            .status-weak { background-color: #f8d7da; color: #721c24; } /* Lighter red */
+
+
+        /* Log container styling */
+        .log-container {
+            max-height: 180px; /* Adjusted max height for logs to be more compact and match chart cards */
+            overflow-y: auto; /* Add scrollbar if content overflows */
+            width: 100%;
+            padding: 0.5rem;
+            background-color: #f1faee; /* Light background for logs */
+            border-radius: 0.5rem;
+            text-align: left; /* Align log text to left */
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); /* Subtle inner shadow */
+            flex-grow: 1; /* Allow log container to grow */
+        }
+        .log-container ul {
+            list-style: none; /* Remove bullet points */
+            padding: 0;
+            margin: 0;
+        }
+        .log-container li {
+            padding: 0.4rem 0.5rem; /* Added horizontal padding */
+            border-bottom: 1px solid #e0e0e0; /* Lighter border */
+            font-size: 0.95rem;
+            color: #1d3557; /* Darker blue for log text */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            line-height: 1.2; /* Adjust line height for log entries */
+            min-height: 2.2rem; /* Minimum height for each log entry */
+        }
+        .log-container li:last-child {
+            border-bottom: none;
+        }
+        .log-container li span {
+            font-weight: 500;
+        }
+
+        /* Dashboard Footer Styling - REMOVED */
+        /* .dashboard-footer { ... } */
+    </style>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="container mx-auto">
+        <!-- Dashboard Header with Logo and Title -->
+        <header class="dashboard-header">
+            <img src="/dashboardlora/logo-iteba.png" alt="ITEBA Logo" class="mb-4 rounded-lg shadow-sm">
+            <h1>LoRa GPS & Detak Jantung Real-time Dashboard</h1>
+            <div class="dashboard-meta-info">
+                <p>ID Perangkat: <span id="deviceId">LORA-DEV-001</span></p>
+                <p>Baterai: <span id="batteryLevel">N/A</span></p>
+                <p>Terakhir Diperbarui: <span id="lastUpdated">N/A</span></p>
+            </div>
+        </header>
+
+        <!-- Heart Rate Main Section -->
+        <div class="main-section heart-rate-section bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Informasi Detak Jantung</h2>
+            <div class="heart-rate-cards-grid grid gap-1.5rem">
+                <!-- Heart Rate Display Card -->
+                <div class="card hr-display-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Detak Jantung Saat Ini</h3>
+                    <p class="heart-rate-display text-red-600 text-5xl font-bold"><span id="heartRate">--</span> BPM</p>
+                </div>
+
+                <!-- Heart Rate Chart Card -->
+                <div class="card hr-chart-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Grafik Detak Jantung</h3>
+                    <div class="hr-chart-area p-2 flex-grow">
+                        <canvas id="heartRateChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Heart Rate History Log Card -->
+                <div class="card hr-log-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Riwayat Detak Jantung</h3>
+                    <div class="log-container">
+                        <ul id="heartRateLog" class="w-full">
+                            <!-- Heart rate log entries will be inserted here by JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Body Temperature Card (Moved here) -->
+                <div class="card body-temperature-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Suhu Badan</h3>
+                    <p class="text-5xl font-bold"><span id="bodyTemperature">--</span> 'C</p>
+                    <div id="bodyTempStatus" class="temp-status">Status: Normal</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LoRa Main Section -->
+        <div class="main-section lora-section bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Informasi LoRa & GPS</h2>
+            <div class="lora-cards-grid grid gap-1.5rem">
+                <!-- GPS Position Card -->
+                <div class="card map-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Posisi GPS</h3>
+                    <div id="mapid"></div>
+                    <div class="location-info mt-4 text-gray-600">
+                        <p>Latitude: <span id="latitude" class="font-medium">N/A</span></p>
+                        <p>Longitude: <span id="longitude" class="font-medium">N/A</span></p>
+                        <p>Altitude: <span id="altitude" class="font-medium">N/A</span> m</p>
+                    </div>
+                </div>
+
+                <!-- LoRa Position History Log Card -->
+                <div class="card position-log-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Riwayat Posisi LoRa</h3>
+                    <div class="log-container">
+                        <ul id="positionLog" class="w-full">
+                            <!-- Position log entries will be inserted here by JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- LoRa DBM & RSSI Card -->
+                <div class="card dbm-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">LoRa Sinyal</h3>
+                    <p class="dbm-display text-green-600 text-5xl font-bold"><span id="dbmValue">--</span> DBM</p>
+                    <div class="dbm-info">
+                        <p>RSSI: <span id="rssiValue">N/A</span></p>
+                    </div>
+                    <div id="signalStatus" class="signal-status">Status Sinyal: N/A</div>
+                </div>
+
+                <!-- LoRa DBM History Log Card -->
+                <div class="card dbm-log-card bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Riwayat DBM LoRa</h3>
+                    <div class="log-container">
+                        <ul id="dbmLog" class="w-full">
+                            <!-- DBM log entries will be inserted here by JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Removed Dashboard Footer for Body Temperature -->
+    <!-- <footer class="dashboard-footer"> ... </footer> -->
+
+    <!-- External JavaScript libraries -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // Wrap all JavaScript in an IIFE to prevent global scope pollution
+        (function() {
+            // Define ITEBA coordinates
+            const ITEBA_LAT = 1.1079; // Latitude for Institut Teknologi Batam
+            const ITEBA_LON = 103.9782; // Longitude for Institut Teknologi Batam
+
+            // Initialize the map centered on Institut Teknologi Batam with a high zoom level
+            var mymap = L.map('mapid').setView([ITEBA_LAT, ITEBA_LON], 18); // Centered on ITEBA with zoom level 18 (very close)
+
+            // Add a tile layer (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(mymap);
+
+            // Initial marker at ITEBA
+            var marker = L.marker([ITEBA_LAT, ITEBA_LON]).addTo(mymap);
+
+            // Chart.js for Heart Rate
+            var ctxHeartRate = document.getElementById('heartRateChart').getContext('2d');
+            var heartRateChart = new Chart(ctxHeartRate, {
+                type: 'line',
+                data: {
+                    labels: [], // Time labels
+                    datasets: [{
+                        label: 'Detak Jantung (BPM)',
+                        data: [],
+                        borderColor: 'rgb(239, 68, 68)', // Tailwind red-500
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Waktu'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'BPM'
+                            },
+                            beginAtZero: true,
+                            min: 40,
+                            max: 180
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Arrays to store DBM, Position, and Heart Rate history
+            const dbmHistory = [];
+            const positionHistory = [];
+            const heartRateHistory = [];
+            // Removed bodyTemperatureHistory as it's no longer used for a log
+            // const bodyTemperatureHistory = []; 
+
+            const MAX_LOG_ENTRIES = 7; // Max number of log entries to display
+
+            // Function to get current time in HH:MM:SS format
+            function getCurrentTime() {
+                const now = new Date();
+                return now.getHours().toString().padStart(2, '0') + ':' +
+                       now.getMinutes().toString().padStart(2, '0') + ':' +
+                       now.getSeconds().toString().padStart(2, '0');
+            }
+
+            // --- Main Dashboard Update Function ---
+            function updateDashboard() {
+                // Simulate data for demonstration (very tight range around ITEBA campus)
+                var newLatitude = ITEBA_LAT + (Math.random() - 0.5) * 0.0005; // Even smaller range for campus area
+                var newLongitude = ITEBA_LON + (Math.random() - 0.5) * 0.0005; // Even smaller range for campus area
+                var newAltitude = Math.floor(Math.random() * (100 - 50 + 1)) + 50; // 50-100m
+                // Simulate heart rate fluctuating around 75 BPM
+                var newHeartRate = Math.floor(75 + (Math.random() - 0.5) * 10); // Fluctuates between ~70-80 BPM
+                var newBodyTemperature = (36.5 + (Math.random() - 0.5) * 1.5).toFixed(1); // Fluctuates around 36.5-37.5°C
+                var newDbm = Math.floor(Math.random() * (-80 - (-120) + 1)) + (-120); // -120 to -80 DBM
+                var newRssi = newDbm + Math.floor(Math.random() * (10 - (-5) + 1)) + (-5); // RSSI typically related to DBM
+                // Fixed battery level to 90%
+                var newBatteryLevel = 90; 
+
+                const currentTime = getCurrentTime();
+
+                // --- Update Header Info ---
+                document.getElementById('deviceId').textContent = 'ITEBA-LORA-001'; // Ensure Device ID is set
+                document.getElementById('batteryLevel').textContent = `${newBatteryLevel}%`;
+                document.getElementById('lastUpdated').textContent = currentTime;
+
+                // --- Update GPS Info ---
+                document.getElementById('latitude').textContent = newLatitude.toFixed(6);
+                document.getElementById('longitude').textContent = newLongitude.toFixed(6); // Corrected this line
+                document.getElementById('altitude').textContent = newAltitude;
+
+                // --- Update Map ---
+                // Set view and marker to the new simulated position around ITEBA
+                mymap.setView([newLatitude, newLongitude], 18);
+                marker.setLatLng([newLatitude, newLongitude]);
+
+                // --- Update Heart Rate Display and Chart ---
+                document.getElementById('heartRate').textContent = newHeartRate;
+                if (heartRateChart.data.labels.length > 10) { // Keep last 10 data points for chart
+                    heartRateChart.data.labels.shift();
+                    heartRateChart.data.datasets[0].data.shift();
+                }
+                heartRateChart.data.labels.push(currentTime);
+                heartRateChart.data.datasets[0].data.push(newHeartRate);
+                heartRateChart.update();
+
+                // --- Update Heart Rate Log ---
+                heartRateHistory.unshift({ time: currentTime, value: newHeartRate }); // Add to beginning of array
+                if (heartRateHistory.length > MAX_LOG_ENTRIES) {
+                    heartRateHistory.pop(); // Remove oldest entry if limit exceeded
+                }
+                const heartRateLogList = document.getElementById('heartRateLog');
+                heartRateLogList.innerHTML = ''; // Clear list before repopulating
+                heartRateHistory.forEach(entry => {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<span>${entry.time}:</span> <span>${entry.value} BPM</span>`;
+                    heartRateLogList.appendChild(listItem);
+                });
+
+                // --- Update Body Temperature ---
+                document.getElementById('bodyTemperature').textContent = newBodyTemperature; // Update the display in the main section card
+                
+                // Update Body Temperature Status (in the main section card)
+                const bodyTempStatusElement = document.getElementById('bodyTempStatus');
+                bodyTempStatusElement.className = 'temp-status'; // Reset classes
+                let tempStatusText = 'Normal';
+                const tempValue = parseFloat(newBodyTemperature);
+                if (tempValue >= 38) { // Example thresholds for fever
+                    tempStatusText = 'Demam';
+                    bodyTempStatusElement.classList.add('temp-fever');
+                } else if (tempValue <= 35) { // Example thresholds for hypothermia
+                    tempStatusText = 'Hipotermia';
+                    bodyTempStatusElement.classList.add('temp-hypothermia');
+                } else {
+                    bodyTempStatusElement.classList.add('temp-normal');
+                }
+                bodyTempStatusElement.textContent = `Status: ${tempStatusText}`;
+
+
+                // --- Update DBM & RSSI Values ---
+                document.getElementById('dbmValue').textContent = newDbm;
+                document.getElementById('rssiValue').textContent = newRssi;
+
+                // --- Update Signal Status ---
+                const signalStatusElement = document.getElementById('signalStatus');
+                signalStatusElement.className = 'signal-status'; // Reset classes
+                let statusText = 'Status Sinyal: ';
+                if (newDbm > -90) { // Example thresholds
+                    statusText += 'Baik';
+                    signalStatusElement.classList.add('status-good');
+                } else if (newDbm > -110) {
+                    statusText += 'Cukup';
+                    signalStatusElement.classList.add('status-fair');
+                } else {
+                    statusText += 'Buruk';
+                    signalStatusElement.classList.add('status-weak');
+                }
+                signalStatusElement.textContent = statusText;
+
+
+                // --- Update DBM Log ---
+                dbmHistory.unshift({ time: currentTime, value: newDbm }); // Add to beginning of array
+                if (dbmHistory.length > MAX_LOG_ENTRIES) {
+                    dbmHistory.pop(); // Remove oldest entry if limit exceeded
+                }
+                const dbmLogList = document.getElementById('dbmLog');
+                dbmLogList.innerHTML = ''; // Clear list before repopulating
+                dbmHistory.forEach(entry => {
+                    const listItem = document.createElement('li');
+                    const dbmColorClass = entry.value > -100 ? 'text-green-600' : (entry.value > -110 ? 'text-yellow-600' : 'text-red-600');
+                    listItem.innerHTML = `<span>${entry.time}:</span> <span class="${dbmColorClass}">${entry.value} DBM</span>`;
+                    dbmLogList.appendChild(listItem);
+                });
+
+                // --- Update Position Log ---
+                positionHistory.unshift({ time: currentTime, lat: newLatitude, lon: newLongitude }); // Add to beginning of array
+                if (positionHistory.length > MAX_LOG_ENTRIES) {
+                    positionHistory.pop(); // Remove oldest entry if limit exceeded
+                }
+                const positionLogList = document.getElementById('positionLog');
+                positionLogList.innerHTML = ''; // Clear list before repopulating
+                positionHistory.forEach(entry => {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<span>${entry.time}:</span> <span>Lat ${entry.lat.toFixed(4)}, Lon ${entry.lon.toFixed(4)}</span>`;
+                    positionLogList.appendChild(listItem);
+                });
+            }
+
+            // Initialize dashboard elements on window load
+            window.onload = function () {
+                // Set static Device ID once
+                document.getElementById('deviceId').textContent = 'ITEBA-LORA-001';
+                updateDashboard(); // Initial update for all dashboard elements
+            };
+
+            // Update dashboard every 3 seconds
+            setInterval(updateDashboard, 3000);
+
+            // Adjust map height on window resize
+            window.addEventListener('resize', function() {
+                mymap.invalidateSize();
+            });
+        })(); // End of IIFE
+    </script>
+</body>
+</html>
